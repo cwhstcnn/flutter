@@ -8,6 +8,7 @@ import 'package:meta/meta.dart';
 
 import '../base/common.dart';
 import '../base/file_system.dart';
+import '../base/io.dart';
 import '../base/os.dart';
 import '../base/process.dart';
 import '../cache.dart';
@@ -35,6 +36,11 @@ class UpgradeCommand extends FlutterCommand {
 
   @override
   bool get shouldUpdateCache => false;
+
+  @override
+  Future<Set<DevelopmentArtifact>> get requiredArtifacts async => <DevelopmentArtifact>{
+    DevelopmentArtifact.universal,
+  };
 
   @override
   Future<FlutterCommandResult> runCommand() async {
@@ -67,6 +73,17 @@ class UpgradeCommandRunner {
         );
       }
     }
+    // If there are uncommitted changes we might be on the right commit but
+    // we should still warn.
+    if (!force && await hasUncomittedChanges()) {
+      throwToolExit(
+        'Your flutter checkout has local changes that would be erased by '
+        'upgrading. If you want to keep these changes, it is recommended that '
+        'you stash them via "git stash" or else commit the changes to a local '
+        'branch. If it is okay to remove local changes, then re-run this '
+        'command with --force.'
+      );
+    }
     await resetChanges(gitTagVersion);
     await upgradeChannel(flutterVersion);
     await attemptFastForward();
@@ -74,6 +91,24 @@ class UpgradeCommandRunner {
     await updatePackages(flutterVersion);
     await runDoctor();
     return null;
+  }
+
+  Future<bool> hasUncomittedChanges() async {
+    try {
+      final RunResult result = await runCheckedAsync(<String>[
+        'git', 'status', '-s'
+      ], workingDirectory: Cache.flutterRoot);
+      return result.stdout.trim().isNotEmpty;
+    } on ProcessException catch (error) {
+      throwToolExit(
+        'The tool could not verify the status of the current flutter checkout. '
+        'This might be due to git not being installed or an internal error.'
+        'If it is okay to ignore potential local changes, then re-run this'
+        'command with --force.'
+        '\nError: $error.'
+      );
+    }
+    return false;
   }
 
   /// Check if there is an upstream repository configured.
@@ -104,11 +139,17 @@ class UpgradeCommandRunner {
     } else {
       tag = 'v${gitTagVersion.x}.${gitTagVersion.y}.${gitTagVersion.z}';
     }
-    final RunResult runResult = await runCheckedAsync(<String>[
-      'git', 'reset', '--hard', tag,
-    ], workingDirectory: Cache.flutterRoot);
-    if (runResult.exitCode != 0) {
-      throwToolExit('Failed to restore branch from hotfix.');
+    try {
+      await runCheckedAsync(<String>[
+        'git', 'reset', '--hard', tag,
+      ], workingDirectory: Cache.flutterRoot);
+    } on ProcessException catch (error) {
+      throwToolExit(
+        'Unable to upgrade Flutter: The tool could not update to the version $tag. '
+        'This may be due to git not being installed or an internal error.'
+        'Please ensure that git is installed on your computer and retry again.'
+        '\nError: $error.'
+      );
     }
   }
 
