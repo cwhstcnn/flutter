@@ -608,6 +608,8 @@ abstract class BoxScrollView extends ScrollView {
 /// explicit [List<Widget>] of children. This [ListView]'s children are made up
 /// of [Container]s with [Text].
 ///
+/// ![A ListView of 3 amber colored containers with sample text.](https://flutter.github.io/assets-for-api-docs/assets/widgets/list_view.png)
+///
 /// ```dart
 /// ListView(
 ///   padding: const EdgeInsets.all(8.0),
@@ -631,10 +633,13 @@ abstract class BoxScrollView extends ScrollView {
 /// )
 /// ```
 /// {@end-tool}
+///
 /// {@tool sample}
 /// This example mirrors the previous one, creating the same list using the
 /// [ListView.builder] constructor. Using the [IndexedWidgetBuilder], children
 /// are built lazily and can be infinite in number.
+///
+/// ![A ListView of 3 amber colored containers with sample text.](https://flutter.github.io/assets-for-api-docs/assets/widgets/list_view_builder.png)
 ///
 /// ```dart
 /// final List<String> entries = <String>['A', 'B', 'C'];
@@ -653,10 +658,14 @@ abstract class BoxScrollView extends ScrollView {
 /// );
 /// ```
 /// {@end-tool}
+///
 /// {@tool sample}
 /// This example continues to build from our the previous ones, creating a
 /// similar list using [ListView.separated]. Here, a [Divider] is used as a
 /// separator.
+///
+/// ![A ListView of 3 amber colored containers with sample text and a Divider
+/// between each of them.](https://flutter.github.io/assets-for-api-docs/assets/widgets/list_view_separated.png)
 ///
 /// ```dart
 /// final List<String> entries = <String>['A', 'B', 'C'];
@@ -908,6 +917,10 @@ class ListView extends BoxScrollView {
   /// `addSemanticIndexes` argument corresponds to the
   /// [SliverChildBuilderDelegate.addSemanticIndexes] property. None may be
   /// null.
+  ///
+  /// [ListView.builder] by default does not support child reordering. If
+  /// you are planning to change child order at a later time, consider using
+  /// [ListView] or [ListView.custom].
   ListView.builder({
     Key key,
     Axis scrollDirection = Axis.vertical,
@@ -1056,6 +1069,84 @@ class ListView extends BoxScrollView {
   ///
   /// For example, a custom child model can control the algorithm used to
   /// estimate the size of children that are not actually visible.
+  ///
+  /// {@tool sample}
+  ///
+  /// This [ListView] uses a custom [SliverChildBuilderDelegate] to support child
+  /// reordering.
+  ///
+  /// ```dart
+  /// class MyListView extends StatefulWidget {
+  ///   @override
+  ///   _MyListViewState createState() => _MyListViewState();
+  /// }
+  ///
+  /// class _MyListViewState extends State<MyListView> {
+  ///   List<String> items = <String>['1', '2', '3', '4', '5'];
+  ///
+  ///   void _reverse() {
+  ///     setState(() {
+  ///       items = items.reversed.toList();
+  ///     });
+  ///   }
+  ///
+  ///   @override
+  ///   Widget build(BuildContext context) {
+  ///     return Scaffold(
+  ///       body: SafeArea(
+  ///         child: ListView.custom(
+  ///           childrenDelegate: SliverChildBuilderDelegate(
+  ///             (BuildContext context, int index) {
+  ///               return KeepAlive(
+  ///                 data: items[index],
+  ///                 key: ValueKey<String>(items[index]),
+  ///               );
+  ///             },
+  ///             childCount: items.length,
+  ///             findChildIndexCallback: (Key key) {
+  ///               final ValueKey valueKey = key;
+  ///               final String data = valueKey.value;
+  ///               return items.indexOf(data);
+  ///             }
+  ///           ),
+  ///         ),
+  ///       ),
+  ///       bottomNavigationBar: BottomAppBar(
+  ///         child: Row(
+  ///           mainAxisAlignment: MainAxisAlignment.center,
+  ///           children: <Widget>[
+  ///             FlatButton(
+  ///               onPressed: () => _reverse(),
+  ///               child: Text('Reverse items'),
+  ///             ),
+  ///           ],
+  ///         ),
+  ///       ),
+  ///     );
+  ///   }
+  /// }
+  ///
+  /// class KeepAlive extends StatefulWidget {
+  ///   const KeepAlive({Key key, this.data}) : super(key: key);
+  ///
+  ///   final String data;
+  ///
+  ///   @override
+  ///   _KeepAliveState createState() => _KeepAliveState();
+  /// }
+  ///
+  /// class _KeepAliveState extends State<KeepAlive> with AutomaticKeepAliveClientMixin{
+  ///   @override
+  ///   bool get wantKeepAlive => true;
+  ///
+  ///   @override
+  ///   Widget build(BuildContext context) {
+  ///     super.build(context);
+  ///     return Text(widget.data);
+  ///   }
+  /// }
+  /// ```
+  /// {@end-tool}
   const ListView.custom({
     Key key,
     Axis scrollDirection = Axis.vertical,
@@ -1516,7 +1607,7 @@ class GridView extends BoxScrollView {
 
   /// A delegate that controls the layout of the children within the [GridView].
   ///
-  /// The [GridView] and [GridView.custom] constructors let you specify this
+  /// The [GridView], [GridView.builder], and [GridView.custom] constructors let you specify this
   /// delegate explicitly. The other constructors create a [gridDelegate]
   /// implicitly.
   final SliverGridDelegate gridDelegate;

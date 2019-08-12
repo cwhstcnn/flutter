@@ -16,6 +16,7 @@ import 'icons.dart';
 import 'ink_well.dart';
 import 'material.dart';
 import 'material_localizations.dart';
+import 'material_state.dart';
 import 'theme.dart';
 import 'theme_data.dart';
 import 'tooltip.dart';
@@ -77,6 +78,15 @@ abstract class ChipAttributes {
   ///
   /// This only has an effect on widgets that respect the [DefaultTextStyle],
   /// such as [Text].
+  ///
+  /// If [labelStyle.color] is a [MaterialStateProperty<Color>], [MaterialStateProperty.resolve]
+  /// is used for the following [MaterialState]s:
+  ///
+  ///  * [MaterialState.disabled].
+  ///  * [MaterialState.selected].
+  ///  * [MaterialState.hovered].
+  ///  * [MaterialState.focused].
+  ///  * [MaterialState.pressed].
   TextStyle get labelStyle;
 
   /// The [ShapeBorder] to draw around the chip.
@@ -1400,6 +1410,8 @@ class _RawChipState extends State<RawChip> with TickerProviderStateMixin<RawChip
   Animation<double> enableAnimation;
   Animation<double> selectionFade;
 
+  final Set<MaterialState> _states = <MaterialState>{};
+
   bool get hasDeleteButton => widget.onDeleted != null;
   bool get hasAvatar => widget.avatar != null;
 
@@ -1410,12 +1422,14 @@ class _RawChipState extends State<RawChip> with TickerProviderStateMixin<RawChip
   }
 
   bool _isTapping = false;
-  bool get isTapping => !canTap ? false : _isTapping;
+  bool get isTapping => canTap && _isTapping;
 
   @override
   void initState() {
     assert(widget.onSelected == null || widget.onPressed == null);
     super.initState();
+    _updateState(MaterialState.disabled, !widget.isEnabled);
+    _updateState(MaterialState.selected, widget.selected ?? false);
     selectController = AnimationController(
       duration: _kSelectDuration,
       value: widget.selected == true ? 1.0 : 0.0,
@@ -1486,12 +1500,17 @@ class _RawChipState extends State<RawChip> with TickerProviderStateMixin<RawChip
     super.dispose();
   }
 
+  void _updateState(MaterialState state, bool value) {
+    value ? _states.add(state) : _states.remove(state);
+  }
+
   void _handleTapDown(TapDownDetails details) {
     if (!canTap) {
       return;
     }
     setState(() {
       _isTapping = true;
+      _updateState(MaterialState.pressed, true);
     });
   }
 
@@ -1501,6 +1520,7 @@ class _RawChipState extends State<RawChip> with TickerProviderStateMixin<RawChip
     }
     setState(() {
       _isTapping = false;
+      _updateState(MaterialState.pressed, false);
     });
   }
 
@@ -1510,10 +1530,23 @@ class _RawChipState extends State<RawChip> with TickerProviderStateMixin<RawChip
     }
     setState(() {
       _isTapping = false;
+      _updateState(MaterialState.pressed, false);
     });
     // Only one of these can be set, so only one will be called.
     widget.onSelected?.call(!widget.selected);
     widget.onPressed?.call();
+  }
+
+  void _handleFocus(bool isFocused) {
+    setState(() {
+      _updateState(MaterialState.focused, isFocused);
+    });
+  }
+
+  void _handleHover(bool isHovered) {
+    setState(() {
+      _updateState(MaterialState.hovered, isHovered);
+    });
   }
 
   /// Picks between three different colors, depending upon the state of two
@@ -1535,6 +1568,7 @@ class _RawChipState extends State<RawChip> with TickerProviderStateMixin<RawChip
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isEnabled != widget.isEnabled) {
       setState(() {
+        _updateState(MaterialState.disabled, !widget.isEnabled);
         if (widget.isEnabled) {
           enableController.forward();
         } else {
@@ -1553,6 +1587,7 @@ class _RawChipState extends State<RawChip> with TickerProviderStateMixin<RawChip
     }
     if (oldWidget.selected != widget.selected) {
       setState(() {
+        _updateState(MaterialState.selected, widget.selected ?? false);
         if (widget.selected == true) {
           selectController.forward();
         } else {
@@ -1621,65 +1656,73 @@ class _RawChipState extends State<RawChip> with TickerProviderStateMixin<RawChip
     final Color selectedShadowColor = widget.selectedShadowColor ?? chipTheme.selectedShadowColor ?? _defaultShadowColor;
     final bool selected = widget.selected ?? false;
 
-    Widget result = Material(
-      elevation: isTapping ? pressElevation : elevation,
-      shadowColor: selected ? selectedShadowColor : shadowColor,
-      animationDuration: pressedAnimationDuration,
-      shape: shape,
-      clipBehavior: widget.clipBehavior,
-      child: InkWell(
-        onTap: canTap ? _handleTap : null,
-        onTapDown: canTap ? _handleTapDown : null,
-        onTapCancel: canTap ? _handleTapCancel : null,
-        customBorder: shape,
-        child: AnimatedBuilder(
-          animation: Listenable.merge(<Listenable>[selectController, enableController]),
-          builder: (BuildContext context, Widget child) {
-            return Container(
-              decoration: ShapeDecoration(
-                shape: shape,
-                color: getBackgroundColor(chipTheme),
+    final TextStyle effectiveLabelStyle = widget.labelStyle ?? chipTheme.labelStyle;
+    final Color resolvedLabelColor =  MaterialStateProperty.resolveAs<Color>(effectiveLabelStyle?.color, _states);
+    final TextStyle resolvedLabelStyle = effectiveLabelStyle?.copyWith(color: resolvedLabelColor);
+
+    Widget result = Focus(
+      onFocusChange: _handleFocus,
+      child: Material(
+        elevation: isTapping ? pressElevation : elevation,
+        shadowColor: selected ? selectedShadowColor : shadowColor,
+        animationDuration: pressedAnimationDuration,
+        shape: shape,
+        clipBehavior: widget.clipBehavior,
+        child: InkWell(
+          onTap: canTap ? _handleTap : null,
+          onTapDown: canTap ? _handleTapDown : null,
+          onTapCancel: canTap ? _handleTapCancel : null,
+          onHover: canTap ? _handleHover : null,
+          customBorder: shape,
+          child: AnimatedBuilder(
+            animation: Listenable.merge(<Listenable>[selectController, enableController]),
+            builder: (BuildContext context, Widget child) {
+              return Container(
+                decoration: ShapeDecoration(
+                  shape: shape,
+                  color: getBackgroundColor(chipTheme),
+                ),
+                child: child,
+              );
+            },
+            child: _wrapWithTooltip(
+              widget.tooltip,
+              widget.onPressed,
+              _ChipRenderWidget(
+                theme: _ChipRenderTheme(
+                  label: DefaultTextStyle(
+                    overflow: TextOverflow.fade,
+                    textAlign: TextAlign.start,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: resolvedLabelStyle,
+                    child: widget.label,
+                  ),
+                  avatar: AnimatedSwitcher(
+                    child: widget.avatar,
+                    duration: _kDrawerDuration,
+                    switchInCurve: Curves.fastOutSlowIn,
+                  ),
+                  deleteIcon: AnimatedSwitcher(
+                    child: _buildDeleteIcon(context, theme, chipTheme),
+                    duration: _kDrawerDuration,
+                    switchInCurve: Curves.fastOutSlowIn,
+                  ),
+                  brightness: chipTheme.brightness,
+                  padding: (widget.padding ?? chipTheme.padding).resolve(textDirection),
+                  labelPadding: (widget.labelPadding ?? chipTheme.labelPadding).resolve(textDirection),
+                  showAvatar: hasAvatar,
+                  showCheckmark: widget.showCheckmark,
+                  canTapBody: canTap,
+                ),
+                value: widget.selected,
+                checkmarkAnimation: checkmarkAnimation,
+                enableAnimation: enableAnimation,
+                avatarDrawerAnimation: avatarDrawerAnimation,
+                deleteDrawerAnimation: deleteDrawerAnimation,
+                isEnabled: widget.isEnabled,
+                avatarBorder: widget.avatarBorder,
               ),
-              child: child,
-            );
-          },
-          child: _wrapWithTooltip(
-            widget.tooltip,
-            widget.onPressed,
-            _ChipRenderWidget(
-              theme: _ChipRenderTheme(
-                label: DefaultTextStyle(
-                  overflow: TextOverflow.fade,
-                  textAlign: TextAlign.start,
-                  maxLines: 1,
-                  softWrap: false,
-                  style: widget.labelStyle ?? chipTheme.labelStyle,
-                  child: widget.label,
-                ),
-                avatar: AnimatedSwitcher(
-                  child: widget.avatar,
-                  duration: _kDrawerDuration,
-                  switchInCurve: Curves.fastOutSlowIn,
-                ),
-                deleteIcon: AnimatedSwitcher(
-                  child: _buildDeleteIcon(context, theme, chipTheme),
-                  duration: _kDrawerDuration,
-                  switchInCurve: Curves.fastOutSlowIn,
-                ),
-                brightness: chipTheme.brightness,
-                padding: (widget.padding ?? chipTheme.padding).resolve(textDirection),
-                labelPadding: (widget.labelPadding ?? chipTheme.labelPadding).resolve(textDirection),
-                showAvatar: hasAvatar,
-                showCheckmark: widget.showCheckmark,
-                canTapBody: canTap,
-              ),
-              value: widget.selected,
-              checkmarkAnimation: checkmarkAnimation,
-              enableAnimation: enableAnimation,
-              avatarDrawerAnimation: avatarDrawerAnimation,
-              deleteDrawerAnimation: deleteDrawerAnimation,
-              isEnabled: widget.isEnabled,
-              avatarBorder: widget.avatarBorder,
             ),
           ),
         ),
@@ -1740,13 +1783,21 @@ class _RenderChipRedirectingHitDetection extends RenderConstrainedBox {
   _RenderChipRedirectingHitDetection(BoxConstraints additionalConstraints) : super(additionalConstraints: additionalConstraints);
 
   @override
-  bool hitTest(HitTestResult result, { Offset position }) {
+  bool hitTest(BoxHitTestResult result, { Offset position }) {
     if (!size.contains(position))
       return false;
     // Only redirects hit detection which occurs above and below the render object.
     // In order to make this assumption true, I have removed the minimum width
     // constraints, since any reasonable chip would be at least that wide.
-    return child.hitTest(result, position: Offset(position.dx, size.height / 2));
+    final Offset offset = Offset(position.dx, size.height / 2);
+    return result.addWithRawTransform(
+      transform: MatrixUtils.forceToPoint(offset),
+      position: position,
+      hitTest: (BoxHitTestResult result, Offset position) {
+        assert(position == offset);
+        return child.hitTest(result, position: offset);
+      },
+    );
   }
 }
 
@@ -2188,29 +2239,40 @@ class _RenderChip extends RenderBox {
     // Now that we know the label height and the width of the icons, we can
     // determine how much to shrink the width constraints for the "real" layout.
     if (constraints.maxWidth.isFinite) {
+      final double maxWidth = math.max(
+        0.0,
+        constraints.maxWidth
+        - iconSizes
+        - theme.labelPadding.horizontal
+        - theme.padding.horizontal,
+      );
       label.layout(
         constraints.copyWith(
           minWidth: 0.0,
-          maxWidth: math.max(
-            0.0,
-            constraints.maxWidth - iconSizes - theme.labelPadding.horizontal,
-          ),
+          maxWidth: maxWidth,
           minHeight: rawSize.height,
           maxHeight: size.height,
         ),
         parentUsesSize: true,
       );
-    } else {
-      label.layout(
-        BoxConstraints(
-          minHeight: rawSize.height,
-          maxHeight: size.height,
-          minWidth: 0.0,
-          maxWidth: size.width,
-        ),
-        parentUsesSize: true,
+
+      final Size updatedSize = _boxSize(label);
+      return Size(
+        updatedSize.width + theme.labelPadding.horizontal,
+        updatedSize.height + theme.labelPadding.vertical,
       );
     }
+
+    label.layout(
+      BoxConstraints(
+        minHeight: rawSize.height,
+        maxHeight: size.height,
+        minWidth: 0.0,
+        maxWidth: size.width,
+      ),
+      parentUsesSize: true,
+    );
+
     return Size(
       rawSize.width + theme.labelPadding.horizontal,
       rawSize.height + theme.labelPadding.vertical,
@@ -2258,7 +2320,7 @@ class _RenderChip extends RenderBox {
   }
 
   @override
-  bool hitTest(HitTestResult result, { Offset position }) {
+  bool hitTest(BoxHitTestResult result, { Offset position }) {
     if (!size.contains(position))
       return false;
     RenderBox hitTestChild;
@@ -2276,7 +2338,18 @@ class _RenderChip extends RenderBox {
           hitTestChild = label ?? avatar;
         break;
     }
-    return hitTestChild?.hitTest(result, position: hitTestChild.size.center(Offset.zero)) ?? false;
+    if (hitTestChild != null) {
+      final Offset center = hitTestChild.size.center(Offset.zero);
+      return result.addWithRawTransform(
+        transform: MatrixUtils.forceToPoint(center),
+        position: position,
+        hitTest: (BoxHitTestResult result, Offset position) {
+          assert(position == center);
+          return hitTestChild.hitTest(result, position: center);
+        },
+      );
+    }
+    return false;
   }
 
   @override

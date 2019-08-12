@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:io' show Platform;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,7 +24,10 @@ final List<SizedBox> _sizedTabs = <SizedBox>[
 ];
 
 Widget _withTheme(
-  TabBarTheme theme, { List<Widget> tabs = _tabs, bool isScrollable = false }) {
+  TabBarTheme theme, {
+  List<Widget> tabs = _tabs,
+  bool isScrollable = false,
+}) {
   return MaterialApp(
     theme: ThemeData(tabBarTheme: theme),
     home: Scaffold(
@@ -102,7 +103,7 @@ void main() {
     const double indicatorWeight = 2.0; // default value
 
     const EdgeInsetsGeometry labelPadding = EdgeInsets.fromLTRB(
-      leftPadding, topPadding, rightPadding, bottomPadding
+      leftPadding, topPadding, rightPadding, bottomPadding,
     );
 
     const TabBarTheme tabBarTheme = TabBarTheme(labelPadding: labelPadding);
@@ -266,10 +267,12 @@ void main() {
 
     await expectLater(
       find.byKey(_painterKey),
-      matchesGoldenFile('tab_bar_theme.tab_indicator_size_tab.png'),
-      skip: !Platform.isLinux,
+      matchesGoldenFile(
+        'tab_bar_theme.tab_indicator_size_tab.png',
+        version: null,
+      ),
     );
-  });
+  }, skip: isBrowser);
 
   testWidgets('Tab bar theme overrides tab indicator size (label)', (WidgetTester tester) async {
     const TabBarTheme tabBarTheme = TabBarTheme(indicatorSize: TabBarIndicatorSize.label);
@@ -278,10 +281,12 @@ void main() {
 
     await expectLater(
       find.byKey(_painterKey),
-      matchesGoldenFile('tab_bar_theme.tab_indicator_size_label.png'),
-      skip: !Platform.isLinux,
+      matchesGoldenFile(
+        'tab_bar_theme.tab_indicator_size_label.png',
+        version: null,
+      ),
     );
-  });
+  }, skip: isBrowser);
 
   testWidgets('Tab bar theme - custom tab indicator', (WidgetTester tester) async {
     final TabBarTheme tabBarTheme = TabBarTheme(
@@ -295,10 +300,12 @@ void main() {
 
     await expectLater(
       find.byKey(_painterKey),
-      matchesGoldenFile('tab_bar_theme.custom_tab_indicator.png'),
-      skip: !Platform.isLinux,
+      matchesGoldenFile(
+        'tab_bar_theme.custom_tab_indicator.png',
+        version: null,
+      ),
     );
-  });
+  }, skip: isBrowser);
 
   testWidgets('Tab bar theme - beveled rect indicator', (WidgetTester tester) async {
     final TabBarTheme tabBarTheme = TabBarTheme(
@@ -312,8 +319,10 @@ void main() {
 
     await expectLater(
       find.byKey(_painterKey),
-      matchesGoldenFile('tab_bar_theme.beveled_rect_indicator.png'),
-      skip: !Platform.isLinux,
+      matchesGoldenFile(
+        'tab_bar_theme.beveled_rect_indicator.png',
+        version: null,
+      ),
     );
-  });
+  }, skip: isBrowser);
 }

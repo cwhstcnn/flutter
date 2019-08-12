@@ -199,7 +199,9 @@ class Scrollable extends StatefulWidget {
   ///
   /// See also:
   ///
-  ///  * [DragGestureRecognizer.dragStartBehavior], which gives an example for the different behaviors.
+  ///  * [DragGestureRecognizer.dragStartBehavior], which gives an example for
+  ///    the different behaviors.
+  ///
   /// {@endtemplate}
   final DragStartBehavior dragStartBehavior;
 
@@ -545,6 +547,9 @@ class ScrollableState extends State<Scrollable> with TickerProviderStateMixin
 
   void _handlePointerScroll(PointerEvent event) {
     assert(event is PointerScrollEvent);
+    if (_physics != null && !_physics.shouldAcceptUserOffset(position)) {
+      return;
+    }
     final double targetScrollOffset = _targetScrollOffsetForPointerScroll(event);
     if (targetScrollOffset != position.pixels) {
       position.jumpTo(targetScrollOffset);
@@ -733,9 +738,9 @@ class _RenderScrollSemantics extends RenderProxyBox {
     final List<SemanticsNode> included = <SemanticsNode>[];
     for (SemanticsNode child in children) {
       assert(child.isTagged(RenderViewport.useTwoPaneSemantics));
-      if (child.isTagged(RenderViewport.excludeFromScrolling))
+      if (child.isTagged(RenderViewport.excludeFromScrolling)) {
         excluded.add(child);
-      else {
+      } else {
         if (!child.hasFlag(SemanticsFlag.isHidden))
           firstVisibleIndex ??= child.indexInParent;
         included.add(child);

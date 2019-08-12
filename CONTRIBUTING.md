@@ -21,7 +21,24 @@ our trust and demonstrated a commitment to Flutter.
 This document focuses on what is needed to contribute by writing code
 and submitting pull requests for the Flutter framework. For
 information on contributing in other ways, see [the community page
-on flutter.io](https://flutter.io/community).
+on flutter.dev](https://flutter.dev/community).
+
+Helping out in the issue database
+---------------------------------
+
+If you want to help us triage, you are very welcome to do so!
+
+1. Join the Gitter channel.
+
+2. Help out as described in our wiki: https://github.com/flutter/flutter/wiki/Triage
+   You won't be able to add labels at first, so instead start by trying to
+   do the other steps, e.g. trying to reproduce the problem and asking for people to
+   provide enough details that you can reproduce the problem, pointing out duplicates,
+   and so on. Chat on the gitter channel to let us know what you're up to!
+ 
+3. Once you've been doing this for a while, someone will invite you to the flutter-hackers
+   team on GitHub and you'll be able to add labels too.
+
 
 Developing for Flutter
 ----------------------
@@ -43,24 +60,24 @@ presented.
 3. [Setting up your engine development environment](https://github.com/flutter/flutter/wiki/Setting-up-the-Engine-development-environment),
    which describes the steps you need to configure your computer to
    work on Flutter's engine. If you only want to write code for the
-   Flutter framework, you can skip this step. Flutter's engine uses
-   mainly C++, Java, and ObjectiveC.
+   Flutter framework, you can skip this step. Flutter's engine mainly
+   uses C++, Java, and Objective-C.
 
 4. [Setting up your framework development environment](https://github.com/flutter/flutter/wiki/Setting-up-the-Framework-development-environment),
    which describes the steps you need to configure your computer to
-   work on Flutter's framework. Flutter's framework uses mainly Dart.
+   work on Flutter's framework. Flutter's framework mainly uses Dart.
 
-4. [Tree hygiene](https://github.com/flutter/flutter/wiki/Tree-hygiene),
+5. [Tree hygiene](https://github.com/flutter/flutter/wiki/Tree-hygiene),
    which covers how to land a PR, how to do code review, how to
    handle breaking changes, how to handle regressions, and how to
    handle post-commit test failures.
 
-3. [Issue hygiene](https://github.com/flutter/flutter/wiki/Issue-hygiene),
+6. [Issue hygiene](https://github.com/flutter/flutter/wiki/Issue-hygiene),
    which covers our processes around triaging bugs, escalating high
    priority bugs, assigning bugs, and our GitHub labels and
    milestones.
 
-5. [Our style guide](https://github.com/flutter/flutter/wiki/Style-guide-for-Flutter-repo),
+7. [Our style guide](https://github.com/flutter/flutter/wiki/Style-guide-for-Flutter-repo),
    which includes advice for designing APIs for Flutter, and how to
    format code in the framework.
 

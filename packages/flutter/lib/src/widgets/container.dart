@@ -44,6 +44,50 @@ import 'image.dart';
 /// ```
 /// {@end-tool}
 ///
+/// ## Layout behavior
+///
+/// _See [BoxConstraints] for an introduction to box layout models._
+///
+/// Since [Container] combines a number of other widgets each with their own
+/// layout behavior, [Container]'s layout behavior is somewhat complicated.
+///
+/// Summary: [Container] tries, in order: to honor [alignment], to size itself to
+/// the [child], to honor the `width`, `height`, and [constraints], to expand to
+/// fit the parent, to be as small as possible.
+///
+/// More specifically:
+///
+/// If the widget has no child, no `height`, no `width`, no [constraints],
+/// and the parent provides unbounded constraints, then [Container] tries to
+/// size as small as possible.
+///
+/// If the widget has no child and no [alignment], but a `height`, `width`, or
+/// [constraints] are provided, then the [Container] tries to be as small as
+/// possible given the combination of those constraints and the parent's
+/// constraints.
+///
+/// If the widget has no child, no `height`, no `width`, no [constraints], and
+/// no [alignment], but the parent provides bounded constraints, then
+/// [Container] expands to fit the constraints provided by the parent.
+///
+/// If the widget has an [alignment], and the parent provides unbounded
+/// constraints, then the [Container] tries to size itself around the child.
+///
+/// If the widget has an [alignment], and the parent provides bounded
+/// constraints, then the [Container] tries to expand to fit the parent, and
+/// then positions the child within itself as per the [alignment].
+///
+/// Otherwise, the widget has a [child] but no `height`, no `width`, no
+/// [constraints], and no [alignment], and the [Container] passes the
+/// constraints from the parent to the child and sizes itself to match the
+/// child.
+///
+/// The [margin] and [padding] properties also affect the layout, as described
+/// in the documentation for those properties. (Their effects merely augment the
+/// rules described above.) The [decoration] can implicitly increase the
+/// [padding] (e.g. borders in a [BoxDecoration] contribute to the [padding]);
+/// see [Decoration.padding].
+///
 /// See also:
 ///
 ///  * [Ink], which paints a [Decoration] on a [Material], allowing
@@ -182,12 +226,15 @@ class DecoratedBox extends SingleChildRenderObjectWidget {
 /// [padding] (e.g. borders in a [BoxDecoration] contribute to the [padding]);
 /// see [Decoration.padding].
 ///
-/// {@tool sample}
+/// ## Example
 ///
+/// {@tool sample}
 /// This example shows a 48x48 amber square (placed inside a [Center] widget in
 /// case the parent widget has its own opinions regarding the size that the
 /// [Container] should take), with a margin so that it stays away from
 /// neighboring widgets:
+///
+/// ![An amber colored container with the dimensions of 48 square pixels.](https://flutter.github.io/assets-for-api-docs/assets/widgets/container_a.png)
 ///
 /// ```dart
 /// Center(
@@ -200,6 +247,7 @@ class DecoratedBox extends SingleChildRenderObjectWidget {
 /// )
 /// ```
 /// {@end-tool}
+///
 /// {@tool sample}
 ///
 /// This example shows how to use many of the features of [Container] at once.
@@ -209,6 +257,9 @@ class DecoratedBox extends SingleChildRenderObjectWidget {
 /// [color] makes the box blue. The [alignment] causes the [child] to be
 /// centered in the box. Finally, the [transform] applies a slight rotation to the
 /// entire contraption to complete the effect.
+///
+/// ![A blue rectangular container with 'Hello World' in the center, rotated
+/// slightly in the z axis.](https://flutter.github.io/assets-for-api-docs/assets/widgets/container_b.png)
 ///
 /// ```dart
 /// Container(
@@ -235,7 +286,7 @@ class DecoratedBox extends SingleChildRenderObjectWidget {
 ///  * [Border], which has a sample which uses [Container] heavily.
 ///  * [Ink], which paints a [Decoration] on a [Material], allowing
 ///    [InkResponse] and [InkWell] splashes to paint over them.
-///  * The [catalog of layout widgets](https://flutter.io/widgets/layout/).
+///  * The [catalog of layout widgets](https://flutter.dev/widgets/layout/).
 class Container extends StatelessWidget {
   /// Creates a widget that combines common painting, positioning, and sizing widgets.
   ///

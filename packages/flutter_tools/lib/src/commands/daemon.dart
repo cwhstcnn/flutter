@@ -26,7 +26,7 @@ import '../run_hot.dart';
 import '../runner/flutter_command.dart';
 import '../vmservice.dart';
 
-const String protocolVersion = '0.4.2';
+const String protocolVersion = '0.5.3';
 
 /// A server process command. This command will start up a long-lived server.
 /// It reads JSON-RPC based commands from stdin, executes them, and returns
@@ -49,6 +49,7 @@ class DaemonCommand extends FlutterCommand {
   @override
   Future<FlutterCommandResult> runCommand() async {
     printStatus('Starting device daemon...');
+    isRunningFromDaemon = true;
 
     final NotifyingLogger notifyingLogger = NotifyingLogger();
 
@@ -203,7 +204,7 @@ abstract class Domain {
   }
 
   void sendEvent(String name, [ dynamic args ]) {
-    final Map<String, dynamic> map = <String, dynamic>{ 'event': name };
+    final Map<String, dynamic> map = <String, dynamic>{'event': name};
     if (args != null)
       map['params'] = _toJsonable(args);
     _send(map);
@@ -248,6 +249,7 @@ class DaemonDomain extends Domain {
   DaemonDomain(Daemon daemon) : super(daemon, 'daemon') {
     registerHandler('version', version);
     registerHandler('shutdown', shutdown);
+    registerHandler('getSupportedPlatforms', getSupportedPlatforms);
 
     sendEvent(
       'daemon.connected',
@@ -300,6 +302,59 @@ class DaemonDomain extends Domain {
   void dispose() {
     _subscription?.cancel();
   }
+
+  /// Enumerates the platforms supported by the provided project.
+  ///
+  /// This does not filter based on the current workflow restrictions, such
+  /// as whether command line tools are installed or whether the host platform
+  /// is correct.
+  Future<Map<String, Object>> getSupportedPlatforms(Map<String, dynamic> args) async {
+    final String projectRoot = _getStringArg(args, 'projectRoot', required: true);
+    final List<String> result = <String>[];
+    try {
+      // TODO(jonahwilliams): replace this with a project metadata check once
+      // that has been implemented.
+      final FlutterProject flutterProject = FlutterProject.fromDirectory(fs.directory(projectRoot));
+      if (flutterProject.linux.existsSync()) {
+        result.add('linux');
+      }
+      if (flutterProject.macos.existsSync()) {
+        result.add('macos');
+      }
+      if (flutterProject.windows.existsSync()) {
+        result.add('windows');
+      }
+      if (flutterProject.ios.existsSync()) {
+        result.add('ios');
+      }
+      if (flutterProject.android.existsSync()) {
+        result.add('android');
+      }
+      if (flutterProject.web.existsSync()) {
+        result.add('web');
+      }
+      if (flutterProject.fuchsia.existsSync()) {
+        result.add('fuchsia');
+      }
+      return <String, Object>{
+        'platforms': result,
+      };
+    } catch (err, stackTrace) {
+      sendEvent('log', <String, dynamic>{
+        'log': 'Failed to parse project metadata',
+        'stackTrace': stackTrace.toString(),
+        'error': true,
+      });
+      // On any sort of failure, fall back to Android and iOS for backwards
+      // comparability.
+      return <String, Object>{
+        'platforms': <String>[
+          'android',
+          'ios',
+        ],
+      };
+    }
+  }
 }
 
 typedef _RunOrAttach = Future<void> Function({
@@ -342,18 +397,18 @@ class AppDomain extends Domain {
     if (await device.isLocalEmulator && !options.buildInfo.supportsEmulator) {
       throw '${toTitleCase(options.buildInfo.friendlyModeName)} mode is not supported for emulators.';
     }
-    final FlutterProject flutterProject = await FlutterProject.current();
-
     // We change the current working directory for the duration of the `start` command.
     final Directory cwd = fs.currentDirectory;
     fs.currentDirectory = fs.directory(projectDirectory);
+    final FlutterProject flutterProject = FlutterProject.current();
 
     final FlutterDevice flutterDevice = await FlutterDevice.create(
       device,
+      flutterProject: flutterProject,
       trackWidgetCreation: trackWidgetCreation,
-      dillOutputPath: dillOutputPath,
       viewFilter: isolateFilter,
       target: target,
+      buildMode: options.buildInfo.mode,
     );
 
     ResidentRunner runner;
@@ -363,22 +418,21 @@ class AppDomain extends Domain {
         <FlutterDevice>[flutterDevice],
         target: target,
         debuggingOptions: options,
-        usesTerminalUI: false,
+        usesTerminalUi: false,
         applicationBinary: applicationBinary,
         projectRootPath: projectRootPath,
         packagesFilePath: packagesFilePath,
         dillOutputPath: dillOutputPath,
         ipv6: ipv6,
         hostIsIde: true,
-        flutterProject: flutterProject,
       );
     } else {
       runner = ColdRunner(
         <FlutterDevice>[flutterDevice],
         target: target,
         debuggingOptions: options,
-        usesTerminalUI: false,
         applicationBinary: applicationBinary,
+        usesTerminalUi: false,
         ipv6: ipv6,
       );
     }
@@ -532,7 +586,7 @@ class AppDomain extends Domain {
     return app.stop().then<bool>(
       (void value) => true,
       onError: (dynamic error, StackTrace stack) {
-        _sendAppEvent(app, 'log', <String, dynamic>{ 'log': '$error', 'error': true });
+        _sendAppEvent(app, 'log', <String, dynamic>{'log': '$error', 'error': true});
         app.closeLogger();
         _apps.remove(app);
         return false;
@@ -550,7 +604,7 @@ class AppDomain extends Domain {
     return app.detach().then<bool>(
       (void value) => true,
       onError: (dynamic error, StackTrace stack) {
-        _sendAppEvent(app, 'log', <String, dynamic>{ 'log': '$error', 'error': true });
+        _sendAppEvent(app, 'log', <String, dynamic>{'log': '$error', 'error': true});
         app.closeLogger();
         _apps.remove(app);
         return false;
@@ -563,10 +617,10 @@ class AppDomain extends Domain {
   }
 
   void _sendAppEvent(AppInstance app, String name, [ Map<String, dynamic> args ]) {
-    final Map<String, dynamic> eventArgs = <String, dynamic> { 'appId': app.id };
-    if (args != null)
-      eventArgs.addAll(args);
-    sendEvent('app.$name', eventArgs);
+    sendEvent('app.$name', <String, dynamic>{
+      'appId': app.id,
+      ...?args,
+    });
   }
 }
 
@@ -605,7 +659,12 @@ class DeviceDomain extends Domain {
   _DeviceEventHandler _onDeviceEvent(String eventName) {
     return (Device device) {
       _serializeDeviceEvents = _serializeDeviceEvents.then<void>((_) async {
-        sendEvent(eventName, await _deviceToMap(device));
+        try {
+          final Map<String, Object> response = await _deviceToMap(device);
+          sendEvent(eventName, response);
+        } catch (err) {
+          printError('$err');
+        }
       });
     };
   }
@@ -652,7 +711,7 @@ class DeviceDomain extends Domain {
 
     hostPort = await device.portForwarder.forward(devicePort, hostPort: hostPort);
 
-    return <String, dynamic>{ 'hostPort': hostPort };
+    return <String, dynamic>{'hostPort': hostPort};
   }
 
   /// Removes a forwarded port.
@@ -714,6 +773,10 @@ Future<Map<String, dynamic>> _deviceToMap(Device device) async {
     'name': device.name,
     'platform': getNameForTargetPlatform(await device.targetPlatform),
     'emulator': await device.isLocalEmulator,
+    'category': device.category?.toString(),
+    'platformType': device.platformType?.toString(),
+    'ephemeral': device.ephemeral,
+    'emulatorId': await device.emulatorId,
   };
 }
 
@@ -721,21 +784,16 @@ Map<String, dynamic> _emulatorToMap(Emulator emulator) {
   return <String, dynamic>{
     'id': emulator.id,
     'name': emulator.name,
+    'category': emulator.category?.toString(),
+    'platformType': emulator.platformType?.toString(),
   };
 }
 
 Map<String, dynamic> _operationResultToMap(OperationResult result) {
-  final Map<String, dynamic> map = <String, dynamic>{
+  return <String, dynamic>{
     'code': result.code,
     'message': result.message,
   };
-
-  if (result.hintMessage != null)
-    map['hintMessage'] = result.hintMessage;
-  if (result.hintId != null)
-    map['hintId'] = result.hintId;
-
-  return map;
 }
 
 dynamic _toJsonable(dynamic obj) {
@@ -816,7 +874,7 @@ class AppInstance {
     return runner.restart(fullRestart: fullRestart, pauseAfterRestart: pauseAfterRestart, reason: reason);
   }
 
-  Future<void> stop() => runner.stop();
+  Future<void> stop() => runner.exit();
   Future<void> detach() => runner.detach();
 
   void closeLogger() {
@@ -955,7 +1013,7 @@ class _AppRunLogger extends Logger {
     if (parent != null) {
       parent.printTrace(message);
     } else {
-      _sendLogEvent(<String, dynamic>{ 'log': message, 'trace': true });
+      _sendLogEvent(<String, dynamic>{'log': message, 'trace': true});
     }
   }
 
